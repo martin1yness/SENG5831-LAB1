@@ -18,6 +18,7 @@
 
 // tick count for scheduler, yellow task, green task
 volatile uint32_t G_msTicks = 0;
+volatile uint32_t G_100msTicks = 0;
 volatile uint32_t G_redToggles = 0;
 volatile uint32_t G_yellowToggles = 0;
 volatile uint32_t G_greenToggles = 0;
@@ -48,8 +49,7 @@ int main()
 
 		// --------- blink LED by using a busy-wait delay implemented with an empty for-loop		
 		//red_led(1);
-		LED_TOGGLE(RED);
-		G_redToggles++;
+		
 		//length = sprintf( tempBuffer, "R toggles %d\r\n", G_redToggles );
 		//print_usb( tempBuffer, length );
 
@@ -57,23 +57,30 @@ int main()
 		lcd_goto_xy(0,0);
 		char* redToggles = malloc(32);
 		itoa(G_redToggles, redToggles, 10);
+		char* yellowToggles = malloc(32);
+		itoa(G_yellowToggles, yellowToggles, 10);
+		char* greenToggles = malloc(32);
+		itoa(G_greenToggles, greenToggles, 10);
 		char* milliSeconds = malloc(32);
 		itoa(G_msTicks, milliSeconds, 10);
-		char* both = malloc(64);
-		strcpy(both, redToggles);
-		strcat(both, ", ");
-		strcat(both, milliSeconds);
-		print(both);
+		char* all = malloc(128);
+		strcpy(all, redToggles);
+		strcat(all, "r, ");
+		strcat(all, yellowToggles);
+		strcat(all, "y, ");
+		strcat(all, greenToggles);
+		strcat(all, "g");
+		print(all);
+		lcd_goto_xy(0, 1);
+		print(milliSeconds);
 		free(redToggles);
+		free(yellowToggles);
+		free(greenToggles);
 		free(milliSeconds);
-		free(both);
+		free(all);
 		//printf("R:%d ",G_redToggles);
 		//#endif
-		
-		// create a for-loop to kill approximately 1 second
-		for (i=0;i<100;++i) { 
-			WAIT_10MS;
-		}
+
 		// ----------- COMMENT OUT above implementation of toggle and replace with this...
 		// ------------------- Have scheduler release tasks using user-specified period
 
@@ -88,6 +95,21 @@ int main()
 		*/
 
 	} //end while loop
+}
+
+inline void toggleRed() {
+	LED_TOGGLE(RED);
+	++G_redToggles;
+}
+
+inline void toggleYellow() {
+	LED_TOGGLE(YELLOW);
+	++G_yellowToggles;
+}
+
+inline void toggleGreen() {
+	LED_TOGGLE(GREEN);
+	++G_greenToggles;
 }
 
 /*
@@ -127,8 +149,8 @@ inline void ConfigurePulseWithModulationClocks() {
 	
 	//
 	// Set 8-bit (0-255) Timer/Counter 0 for 100ms resolution (10Hz)
-	//  20,000,000 * 1 / 1024 * 1 / 195 = 100.1602564
-	//  
+	//  20,000,000 * 1 / y * 1 / x * 1 / 1000 = 1 / 100ms
+	//  2,000,000 / y = x
 	// Timer/Counter Control Registers A/B
 	//  10 (non-inverted a) 10 (non-inverted b) 00 (read-only) 11 (Fast PWM)
 	TCCR0A = 0xA3; // 10100011
@@ -139,16 +161,39 @@ inline void ConfigurePulseWithModulationClocks() {
 	TIMSK0 = 0x02; // 00000010
 	// Output Compare Registers 0 A
 	OCR0A = 195;
+	
+	// 
+	// Set Timer 1 (16-bit) PWD
+	//
+	TCCR1A = 0xA3;
+	TCCR1B = 0x02;
+	TIMSK1 = 0x02;
+	OCR1A = 2500;
 }
 
 // Interrupt Service Routine every 1 ms using 16 bit timer/counter 3
 ISR(TIMER3_COMPA_vect) {
-	++G_msTicks;
+	if(++G_msTicks % 1000 == 0) {
+		toggleRed();	
+	}
 }
 
 //
-// 100ms Timer every 100.1602564ms
+// 100.01602564Hz (~10ms)
 //
+volatile uint16_t helperCount = 0;
 ISR(TIMER0_COMPA_vect) {
-	
+	helperCount = (helperCount + 1) % 8;
+	if(helperCount == 0) {
+		if(++G_100msTicks % 10 ==0) {
+			toggleYellow();	
+		}
+	}
+}
+
+//
+// User Defined Frequency
+//
+ISR(TIMER1_COMPA_vect) {
+	toggleGreen();
 }
