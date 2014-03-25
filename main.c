@@ -19,6 +19,7 @@
 // tick count for scheduler, yellow task, green task
 volatile uint32_t G_timer3Ticks = 0;
 volatile uint32_t G_timer0Ticks = 0;
+volatile uint32_t G_timer1Ticks = 0;
 volatile uint32_t G_redToggles = 0;
 volatile uint32_t G_yellowToggles = 0;
 volatile uint32_t G_greenToggles = 0;
@@ -181,7 +182,7 @@ inline void ConfigurePulseWithModulationClocks() {
 
 // Interrupt Service Routine every 100 ms using 16 bit timer/counter 3
 ISR(TIMER3_COMPA_vect) {
-	if(++G_timer3Ticks % 10 == 0) {
+	if(++G_timer3Ticks % 20 == 0) {
 		toggleRed();	
 	}
 }
@@ -190,7 +191,10 @@ ISR(TIMER3_COMPA_vect) {
 // 10000Hz (.1ms)
 //
 ISR(TIMER0_COMPA_vect) {
-	if(++G_timer0Ticks % 10000 ==0) {
+	//for(int i=0; i<9; i++) {
+	//	WAIT_10MS;
+	//}
+	if(++G_timer0Ticks % 20000 ==0) {
 		toggleYellow();			
 	}
 }
@@ -199,7 +203,10 @@ ISR(TIMER0_COMPA_vect) {
 // User Defined Frequency
 //
 ISR(TIMER1_COMPA_vect) {
-	if(++G_greenToggles % 10 == 0) {	
+	//for(int i=0; i<9; i++) {
+	//	WAIT_10MS;
+	//}
+	if(++G_timer1Ticks % 20 == 0) {	
 		toggleGreen();
 	}
 }
