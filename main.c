@@ -191,7 +191,7 @@ ISR(TIMER3_COMPA_vect) {
 // 10000Hz (.1ms)
 //
 ISR(TIMER0_COMPA_vect) {
-	for(int i=0; i<9; i++) {
+	for(int i=0; i<11; i++) {
 		WAIT_10MS;
 	}
 	if(++G_timer0Ticks % 20000 ==0) {
