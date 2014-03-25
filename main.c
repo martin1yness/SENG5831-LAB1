@@ -17,8 +17,8 @@
  */
 
 // tick count for scheduler, yellow task, green task
-volatile uint32_t G_msTicks = 0;
-volatile uint32_t G_100msTicks = 0;
+volatile uint32_t G_timer3Ticks = 0;
+volatile uint32_t G_timer0Ticks = 0;
 volatile uint32_t G_redToggles = 0;
 volatile uint32_t G_yellowToggles = 0;
 volatile uint32_t G_greenToggles = 0;
@@ -53,7 +53,7 @@ int main()
 		//length = sprintf( tempBuffer, "R toggles %d\r\n", G_redToggles );
 		//print_usb( tempBuffer, length );
 
-		//#ifdef ECHO2LCD
+		#ifdef ECHO2LCD
 		lcd_goto_xy(0,0);
 		char* redToggles = malloc(32);
 		itoa(G_redToggles, redToggles, 10);
@@ -62,7 +62,7 @@ int main()
 		char* greenToggles = malloc(32);
 		itoa(G_greenToggles, greenToggles, 10);
 		char* milliSeconds = malloc(32);
-		itoa(G_msTicks, milliSeconds, 10);
+		itoa(G_timer3Ticks, milliSeconds, 10);
 		char* all = malloc(128);
 		strcpy(all, redToggles);
 		strcat(all, "r, ");
@@ -78,8 +78,8 @@ int main()
 		free(greenToggles);
 		free(milliSeconds);
 		free(all);
+		#endif
 		//printf("R:%d ",G_redToggles);
-		//#endif
 
 		// ----------- COMMENT OUT above implementation of toggle and replace with this...
 		// ------------------- Have scheduler release tasks using user-specified period
@@ -89,10 +89,12 @@ int main()
 		// --------------- RED task
 
 		// --------------- MENU task
-		/*
+		///*
+		#ifndef ECHO2LCD
 		serial_check();
 		check_for_new_bytes_received();
-		*/
+		#endif		
+		//*/
 
 	} //end while loop
 }
@@ -124,14 +126,30 @@ inline void toggleGreen() {
 inline void ConfigurePulseWithModulationClocks() {
 	// Red 2 Green 5  00100100
 	// Disabled because board resets when enabled, assuming power draw problem
-	//DDRA |= 0x24; // 00100100 
+	//DDRA |= 0x24; // 00100100
+	//DDRA |= 0x05; // 0000_0101
+	DDRD |= (1 << DDD5); // PORTD PIN5 output
+	
+	//
+	// Set 8-Bit Time/Counter 2 for 1ms resolution
+	//
+	//   20mil * 1/prescaler * 1/CompareMatchRegister = 1000 Hz (1ms)
+	//   20mil / 8 / 250 = 10000 Hz (.1ms)
+	//
+	// setting of WGM01 to get CTC mode
+	TCCR0A = 0x02; // 0000_0010 
+	//  00 (n/a) 00 (read-only) 0 (Fast PWM) 010 (8 prescaler)
+	TCCR0B = 0x02; // 0000_0101
+	//  00000 (reserved) 0 (compare b interrupt) 1 (compare a interrupt) 0 (overflow interrupt)
+	TIMSK0 = 0x02; // 0000_0010
+	// Output Compare Registers 0 A
+	OCR0A = 250;
+	 
 	//
 	// Set 16-bit Timer/Counter 1 for 1ms resolution
 	//
-	//   Clock 20Mil * 1/prescaler * CompareMatchRegister = 1000 Hz
-	//   2500000 / CMR = 1000 Hz
-	//   CMR = 2500000 / 1000
-	//   CMR = 2500
+	//   Clock 20Mil * 1/prescaler * 1/CompareMatchRegister = 10 Hz (100ms)
+	//   20M / 64 / 31250 = 10
 	
 	// Timer/Counter Control Registers 3 A - xxxxxx00 bit
 	TCCR3A &= ~(1 << WGM31);
@@ -139,55 +157,41 @@ inline void ConfigurePulseWithModulationClocks() {
 	// Timer/Counter Control Register 3 B - xxx01010
 	TCCR3B &= ~(1 << WGM33); // xxx0xxxx
 	TCCR3B |= (1 << WGM32); // xxxx1xxx
-	TCCR3B &= ~(1 << CS02);  // xxxxx0xx
-	TCCR3B |= (1 << CS01);  // xxxxxx1x
-	TCCR3B &= ~(1 << CS00);  // xxxxxxx0
+	// 64 prescaler
+	TCCR3B &= ~(1 << CS32);  // xxxxx0xx
+	TCCR3B |= (1 << CS31);  // xxxxxx1x
+	TCCR3B |= (1 << CS30);  // xxxxxxx1
 	// Timer Interrupt Mask Register - xxxxxx1x
 	TIMSK3 |= (1 << OCIE3A); // xxxxxx1x
 	// Output Compare Registers 3 A
-	OCR3A = 2500;
+	OCR3A = 31250;
 	
-	//
-	// Set 8-bit (0-255) Timer/Counter 0 for 100ms resolution (10Hz)
-	//  20,000,000 * 1 / y * 1 / x * 1 / 1000 = 1 / 100ms
-	//  2,000,000 / y = x
-	// Timer/Counter Control Registers A/B
-	//  10 (non-inverted a) 10 (non-inverted b) 00 (read-only) 11 (Fast PWM)
-	TCCR0A = 0xA3; // 10100011
-	//  00 (n/a) 00 (read-only) 0 (Fast PWM) 101 (1024 prescaler)
-	TCCR0B = 0x05; // 00000101
-	// Timer Interrupt Mask Register
-	//  00000 (reserved) 0 (compare b interrupt) 1 (compare a interrupt) 0 (overflow interrupt)
-	TIMSK0 = 0x02; // 00000010
-	// Output Compare Registers 0 A
-	OCR0A = 195;
 	
 	// 
 	// Set Timer 1 (16-bit) PWD
 	//
-	TCCR1A = 0xA3;
-	TCCR1B = 0x02;
-	TIMSK1 = 0x02;
-	OCR1A = 2500;
+	// 10 (Channel A Toggle High/Low Output - Because PWD) 00 (Channel B Output) 00 (RESERVED) 11 (PWM Fast OCRnA top)
+	TCCR1A = 0x83; // 1000_0011
+	// Default 64bit prescaler
+	TCCR1B |= 0x03; // xxxx_x011
+	TCCR1B |= (1 << WGM13) | (1 << WGM12); // xxx1_1xxx
+	TIMSK1 = 0x02; // Interrupt to count ticks
+	OCR1A = 31250;
 }
 
-// Interrupt Service Routine every 1 ms using 16 bit timer/counter 3
+// Interrupt Service Routine every 100 ms using 16 bit timer/counter 3
 ISR(TIMER3_COMPA_vect) {
-	if(++G_msTicks % 1000 == 0) {
+	if(++G_timer3Ticks % 10 == 0) {
 		toggleRed();	
 	}
 }
 
 //
-// 100.01602564Hz (~10ms)
+// 10000Hz (.1ms)
 //
-volatile uint16_t helperCount = 0;
 ISR(TIMER0_COMPA_vect) {
-	helperCount = (helperCount + 1) % 8;
-	if(helperCount == 0) {
-		if(++G_100msTicks % 10 ==0) {
-			toggleYellow();	
-		}
+	if(++G_timer0Ticks % 10000 ==0) {
+		toggleYellow();			
 	}
 }
 
@@ -195,5 +199,7 @@ ISR(TIMER0_COMPA_vect) {
 // User Defined Frequency
 //
 ISR(TIMER1_COMPA_vect) {
-	toggleGreen();
+	if(++G_greenToggles % 10 == 0) {	
+		toggleGreen();
+	}
 }

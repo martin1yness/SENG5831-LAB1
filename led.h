@@ -23,8 +23,8 @@
 
 // define the output ports by which you send signals to the LEDs
 #define PORT_RED PORTA
-#define PORT_YELLOW PORTD
-#define PORT_GREEN PORTA
+#define PORT_YELLOW PORTA
+#define PORT_GREEN PORTD
 
 // define the bit-masks for each port that the LEDs are attached to
 #define BIT_RED      ( 1 << 2 )

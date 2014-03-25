@@ -13,4 +13,7 @@ volatile uint32_t G_redToggles;
 volatile uint32_t G_yellowToggles;
 volatile uint32_t G_greenToggles;
 
+#define SET_TIMER1_PRESCALER(x)     (TCCR1B |= ##x)
+#define SET_TIMER1_COMPAREMATCH(x)  (OCR1A = ##x)
+
 #endif
