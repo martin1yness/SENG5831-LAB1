@@ -10,7 +10,7 @@
 #include "led.h"
 
 // number of empty for loops to eat up about 10 ms
-#define FOR_COUNT_10MS 5263
+#define FOR_COUNT_10MS 6000
 
 volatile uint32_t __ii;
 
